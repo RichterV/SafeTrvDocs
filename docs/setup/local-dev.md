@@ -1,12 +1,24 @@
 # Ambiente de desenvolvimento local
 
+## Dois repositórios
+
+O código (backend, `menu.sh`, `docker-compose.yml`) vive no repositório **SafeTrv**, hospedado num Gitea privado da equipe (sem espelho público). Esta documentação vive separadamente em [SafeTrvDocs](https://github.com/RichterV/SafeTrvDocs), publicada em [richterv.github.io/SafeTrvDocs](https://richterv.github.io/SafeTrvDocs/). Para desenvolver localmente, clone os dois lado a lado:
+
+```
+Projetos/
+  SafeTrv/        # código — backend, menu.sh, docker-compose.yml
+  SafeTrvDocs/     # esta documentação
+```
+
+`./menu.sh` (dentro de `SafeTrv/`) detecta `../SafeTrvDocs` automaticamente para a opção de servir a documentação localmente.
+
 ## Pré-requisitos
 
 - Python 3.10+ e [uv](https://docs.astral.sh/uv/)
 - Docker Engine + Compose plugin (para Postgres + PostGIS via Docker Compose) — em Linux, instalar via o repositório oficial da Docker (`docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, `docker-compose-plugin`); em outros sistemas, o Docker Desktop cobre o mesmo papel
 - Node.js 20+ (para o frontend Ionic, quando for criado)
 
-Atalho: use `./menu.sh` (raiz do repositório) para um menu interativo que cobre a maior parte dos comandos abaixo (subir/parar o ambiente, rodar testes, importar dados, servir a documentação, commit rápido).
+Atalho: use `./menu.sh` (raiz do repositório **SafeTrv**) para um menu interativo que cobre a maior parte dos comandos abaixo (subir/parar o ambiente, rodar testes, importar dados, servir a documentação, commit rápido).
 
 ## Backend
 
