@@ -6,6 +6,8 @@ Detalhamento de `backend/app/services/`, com os valores e comportamentos **realm
 
 Cliente do OpenRouteService: recebe origem, destino e paradas opcionais, retorna a geometria da rota (`RouteResult`, uma lista de pontos `(lat, lng, tempo_decorrido_em_segundos)`), a distância total e a duração estimada. É a única dependência externa cuja falha derruba a criação da viagem (`502`) — sem uma rota não há como segmentar nem avaliar risco.
 
+`get_route_alternatives(origin, destination, target_count=2)` usa o recurso `alternative_routes` da API do OpenRouteService para buscar até `target_count` rotas alternativas entre dois pontos — usado pela sugestão automática de rota alternativa (ver abaixo). **Duas limitações do provedor, não do nosso código:** só aceita exatamente 2 coordenadas (sem paradas intermediárias) e só aceita rotas de **até 100 km** — acima disso a API responde `400` (`"the approximated route distance must not be greater than 100000.0 meters"`), confirmado em teste real. `_find_lower_risk_alternative` (em `trip_planner.py`) trata esse erro como não-fatal.
+
 ## Segmentação — `segmentation.py`
 
 `build_segments(route, departure_at, segment_seconds)` divide a rota em N trechos de duração aproximadamente igual, onde `N = round(duração_total / segment_seconds)` (hoje `segment_seconds` = 12 min, configurável via `SEGMENT_TARGET_MINUTES`). A posição de início/fim de cada trecho é interpolada linearmente entre os pontos da rota mais próximos daquele instante de tempo — não recalcula a distância real percorrida ponto a ponto dentro do trecho, é uma aproximação proporcional ao tempo.
@@ -50,7 +52,19 @@ O score final é limitado a 100 e arredondado a 1 casa decimal. Faixas de classi
 
 ## Orquestração — `trip_planner.py`
 
-`plan_trip(...)` é o ponto de entrada único chamado por `POST /trips`. Coordena, nesta ordem: rota → segmentação → previsão em lote → avisos INMET → distância a rio por segmento → score por segmento → persistência de `Trip`/`RouteSegment`/`SegmentRiskAssessment`/`TripRiskSummary`/`Alert`. É o lugar certo para adicionar novos fatores de risco (seção 5-A do CLAUDE.md) ou a sugestão automática de rota alternativa (próximo item do backlog).
+`plan_trip(...)` é o ponto de entrada único chamado por `POST /trips`. Coordena, nesta ordem: rota → segmentação → previsão em lote → avisos INMET → score por segmento (`_score_segments`, compartilhada com a busca de rota alternativa) → persistência de `Trip`/`RouteSegment`/`SegmentRiskAssessment`/`TripRiskSummary`/`Alert` → sugestão de rota alternativa, se aplicável. É o lugar certo para adicionar novos fatores de risco (seção 5-A do CLAUDE.md).
+
+### Sugestão automática de rota alternativa
+
+Implementada em `_find_lower_risk_alternative`, chamada por `plan_trip` só quando `TripRiskSummary.risk_level` é Alto/Crítico **e** a viagem não tem waypoints (limitação do `alternative_routes` do ORS, ver acima):
+
+1. Busca até 2 rotas alternativas via `routing.get_route_alternatives(origem, destino)`.
+2. Para cada uma, roda `_score_segments` (mesma função usada na rota principal — sem duplicar a lógica de risco).
+3. Escolhe a alternativa com menor `score_max`.
+4. Só persiste se essa alternativa for **estritamente menor** que o `score_max` da rota principal — se nenhuma alternativa for melhor (comum quando um aviso oficial do INMET cobre uma área ampla, já que qualquer rota ali cai no mesmo piso), não sugere nada.
+5. Se encontrar uma alternativa melhor, persiste em `AlternativeRoute` (ver [Modelo de dados](data-model.md#alternative_routes)) e gera um `Alert` do tipo `rota_alternativa`.
+
+Qualquer falha nesse processo (`routing.RoutingError`, `weather.WeatherError`) é tratada como não-fatal — loga um warning e a viagem é criada normalmente, sem a sugestão. Testado com mocks em `tests/test_trip_planner.py` (3 cenários: alternativa melhor escolhida, nenhuma alternativa melhor, falha do provedor) — o caminho "alternativa encontrada" é difícil de reproduzir ao vivo porque exige uma área coberta por um aviso oficial estreita o bastante para uma rota alternativa escapar dela, e ao mesmo tempo dentro do limite de 100 km do provedor.
 
 ## Conexões WebSocket — `connection_manager.py`
 

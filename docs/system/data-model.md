@@ -12,6 +12,7 @@ Account ──< User >── UserRole (papéis: admin | gerente | viajante, N:N 
    └──< Trip ──< RouteSegment ──< SegmentRiskAssessment
           │            
           ├── TripRiskSummary (1:1)
+          ├── AlternativeRoute (1:1, opcional)
           ├──< Alert
           └──< LivePosition >── User (traveler_id)
 
@@ -80,6 +81,18 @@ Uma avaliação de risco por segmento — hoje sempre 1:1 com `route_segments` (
 
 1:1 com `trips` (`trip_id` é `unique`). Agrega `score_max` (usado como o nível de risco geral da viagem — CLAUDE.md seção 5: "pior segmento") e `score_avg` como contexto adicional.
 
+### `alternative_routes`
+
+1:1 opcional com `trips` (`trip_id` é `unique`) — só existe quando o sistema encontrou uma rota alternativa com risco estritamente menor que a rota principal (ver [Serviços internos](services.md#sugestao-automatica-de-rota-alternativa)). Diferente de `route_segments`/`segment_risk_assessments`, **não** tem uma tabela relacional própria para os segmentos — é um resumo agregado, deliberadamente mais simples que a rota principal:
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `distance_km`, `duration_estimated_minutes` | float/int | |
+| `geometry` | JSONB | lista de `[lat, lng]` — toda a geometria da rota, para desenhar no mapa do frontend |
+| `segments_summary` | JSONB | lista de objetos `{sequence, start_lat, start_lng, end_lat, end_lng, distance_km, estimated_arrival_at, score, risk_level}` — um resumo por trecho, análogo a `RouteSegmentRead` mas sem tabela própria |
+| `score_max`, `score_avg`, `risk_level` | float/float/enum | mesma semântica de `trip_risk_summaries` |
+| `calculated_at` | timestamptz | |
+
 ### `alerts`
 
 | Coluna | Tipo |
@@ -89,7 +102,7 @@ Uma avaliação de risco por segmento — hoje sempre 1:1 com `route_segments` (
 | `message` | texto livre |
 | `acknowledged`, `acknowledged_at` | suporte a "registro de reconhecimento de alerta" (Horizonte 1 do backlog de produto) — campos já existem no modelo, mas **nenhum endpoint ainda os atualiza** |
 
-Hoje só os tipos `oficial` e `chuva` são gerados automaticamente (por `trip_planner.py`, quando um segmento atinge Alto/Crítico). `rio` e `rota_alternativa` existem no enum para uso futuro.
+Gerados automaticamente por `trip_planner.py`: `oficial`/`chuva` quando um segmento atinge Alto/Crítico, e `rota_alternativa` quando uma rota com risco menor é encontrada (ver `alternative_routes` acima). `rio` existe no enum mas ainda não é usado.
 
 ## Rastreamento ao vivo
 

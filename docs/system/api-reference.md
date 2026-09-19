@@ -81,8 +81,28 @@ Erros do pipeline:
 
 - `502 Bad Gateway` se o cálculo de rota (OpenRouteService) falhar — sem rota não há como segmentar nem avaliar risco.
 - Falha do INMET **não** derruba a criação da viagem — degrada graciosamente (loga warning, segue sem o piso mínimo de risco oficial).
+- Falha ao buscar rota alternativa (provedor indisponível, ou limite de 100km do ORS) **não** derruba a criação da viagem — degrada graciosamente, sem `alternative_route` na resposta.
 
-Retorna `201` com o objeto `Trip` completo: dados da viagem, lista de `segments` (cada um com seus `risk_assessments`), `risk_summary` (score máximo, médio, nível) e `alerts` gerados.
+Retorna `201` com o objeto `Trip` completo: dados da viagem, lista de `segments` (cada um com seus `risk_assessments`), `risk_summary` (score máximo, médio, nível), `alternative_route` (ver abaixo, `null` se nenhuma alternativa foi sugerida) e `alerts` gerados.
+
+**`alternative_route`** (presente só quando: risco Alto/Crítico, sem paradas intermediárias, e uma alternativa com risco menor foi encontrada dentro do limite de 100km do provedor — ver [Serviços internos](services.md#sugestao-automatica-de-rota-alternativa)):
+
+```json
+{
+  "distance_km": 52.3,
+  "duration_estimated_minutes": 48,
+  "geometry": [[-24.9558, -53.4552]],
+  "segments_summary": [
+    {"sequence": 1, "start_lat": 0, "start_lng": 0, "end_lat": 0, "end_lng": 0,
+     "distance_km": 6.2, "estimated_arrival_at": "2026-09-19T03:12:00+00:00",
+     "score": 32.0, "risk_level": "medio"}
+  ],
+  "score_max": 32.0,
+  "score_avg": 28.5,
+  "risk_level": "medio",
+  "calculated_at": "2026-09-19T01:26:46Z"
+}
+```
 
 ### `GET /trips`
 
