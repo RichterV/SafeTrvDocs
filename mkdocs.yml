@@ -1,0 +1,42 @@
+site_name: SafeTrv
+site_description: Documentação do SafeTrv — planejamento de viagens rodoviárias com risco climático
+docs_dir: docs
+theme:
+  name: material
+  language: pt-BR
+  palette:
+    - scheme: default
+      primary: indigo
+      toggle:
+        icon: material/weather-night
+        name: Modo escuro
+    - scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Modo claro
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - content.code.copy
+
+nav:
+  - Início: index.md
+  - Negócio:
+      - Visão geral: business/overview.md
+      - Regras de negócio: business/rules.md
+      - Índice de risco: business/risk-index.md
+  - Sistema:
+      - Visão geral da arquitetura: system/overview.md
+      - Referência da API: system/api-reference.md
+      - WebSocket (rastreamento ao vivo): system/websocket.md
+      - Serviços internos: system/services.md
+      - Modelo de dados: system/data-model.md
+  - Setup:
+      - Ambiente local: setup/local-dev.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
