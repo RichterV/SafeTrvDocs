@@ -1,6 +1,6 @@
 # Visão geral da arquitetura
 
-O SafeTrv é hoje um monorepo com um backend FastAPI completo e um frontend ainda não iniciado. Esta seção documenta o sistema como ele **realmente está implementado** (não a proposta original) — para a visão de produto/negócio e o backlog priorizado, ver [Negócio](../business/overview.md) e [Regras de negócio](../business/rules.md).
+O SafeTrv é hoje um monorepo com um backend FastAPI e um frontend Ionic + Angular (web + mobile, ver [Frontend](frontend.md)). Esta seção documenta o sistema como ele **realmente está implementado** (não a proposta original) — para a visão de produto/negócio e o backlog priorizado, ver [Negócio](../business/overview.md) e [Regras de negócio](../business/rules.md).
 
 ## Stack
 
@@ -69,7 +69,7 @@ Ver o detalhamento de cada serviço em [Serviços internos](services.md), os end
 - JWT com dois tipos de token: `access` (curta duração, `access_token_expire_minutes`) e `refresh` (`refresh_token_expire_days`).
 - `POST /auth/login` e `/auth/signup` retornam os dois tokens; `POST /auth/refresh` troca um refresh token válido por um novo access token.
 - Para requisições REST, o access token vai no header `Authorization: Bearer <token>`.
-- Para o WebSocket, o token vai por **query param** (`?token=...`) porque o handshake de WebSocket do navegador não permite definir headers customizados — ver [WebSocket](websocket.md).
+- Para o WebSocket, o handshake do navegador não permite headers, então o cliente troca o access token (via HTTP) por um **ticket de uso único** de 30 s e conecta com `?ticket=...` — o access token nunca vai na URL. Ver [WebSocket](websocket.md#autenticacao-ticket-de-uso-unico-nao-o-access-token).
 
 ## Ambiente de execução
 

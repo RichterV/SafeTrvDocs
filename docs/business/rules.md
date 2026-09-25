@@ -49,14 +49,28 @@ Uma viagem pode ser cadastrada com até **7 dias de antecedência**. Quanto mais
 
 Quando a viagem calculada dá risco Alto ou Crítico, o sistema busca automaticamente, no mesmo instante em que a viagem é criada, se existe um caminho alternativo entre a origem e o destino com risco menor. Se encontrar um caminho melhor, ele fica disponível junto com a viagem (distância, tempo estimado e nível de risco de cada opção) e um alerta específico é gerado avisando que há uma alternativa mais segura.
 
-**Duas limitações importantes de hoje:**
-- Só funciona para viagens **sem paradas no meio do caminho** (só origem → destino direto).
-- Só funciona para trajetos de **até ~100 km** — é um limite técnico do provedor de rotas usado pelo sistema. Como viagens de transporte de carga costumam ser mais longas que isso (ver perfis de cliente), na prática essa sugestão ainda não aparece na maioria das viagens de longa distância — é uma limitação conhecida, já mapeada para ser resolvida numa próxima etapa.
+Funciona para viagens de **qualquer distância** e **com ou sem paradas** no meio do caminho. Em viagens longas, o sistema não troca a viagem inteira por outra: ele procura um **desvio local** só em volta de cada trecho perigoso e mantém o resto do caminho original. A rota sugerida continua passando por todas as paradas combinadas.
+
+**Limitações de hoje:**
+- Se o trecho perigoso fica **colado na origem, no destino ou numa parada**, não tem como desviar dele — o veículo precisa passar por ali de qualquer jeito.
+- Numa viagem com muitos trechos perigosos, o sistema tenta desviar dos **4 piores**; os demais continuam como na rota original.
+- Hoje o sistema escolhe a alternativa com **menor risco**, sem limite de quanto tempo a mais ela leva. Cabe ao Gerente avaliar se o desvio compensa.
 - Quando um aviso oficial do governo cobre uma área muito grande, é comum que **nenhuma alternativa seja encontrada** — se toda a região ao redor está sob o mesmo aviso, qualquer caminho alternativo teria o mesmo risco mínimo, então o sistema corretamente não sugere trocar de rota "só para trocar".
+
+## Início, fim e cancelamento de uma viagem
+
+Toda viagem nasce como **planejada**. A partir daí:
+
+- **Só o motorista (Viajante) inicia a viagem** — é ele quem sabe quando de fato saiu. A partir desse momento a viagem fica **em andamento** e o sistema registra o horário real de início.
+- **A localização em tempo real só é registrada com a viagem em andamento.** Antes de iniciar ou depois de encerrar, o aplicativo pode continuar aberto, mas a posição do motorista não é gravada — assim o histórico de trajeto reflete só o período real da viagem.
+- **Concluir** a viagem pode ser feito pelo motorista ou pelo Gerente/Administrador (o Gerente pode encerrar caso o motorista esqueça).
+- **Cancelar** é decisão da gestão: só Gerente ou Administrador cancelam, tanto antes de sair quanto no meio do caminho. O motorista não cancela sozinho uma viagem que foi planejada para ele.
+- Uma viagem concluída ou cancelada **não pode ser reaberta** — se precisar refazer o trajeto, cadastra-se uma nova viagem.
+
+Quem estiver acompanhando a viagem (motorista e Gerente) vê a mudança de situação na hora.
 
 ## O que o sistema ainda não faz (mas está no plano)
 
-- **Marcar quando uma viagem realmente começou** — hoje o sistema registra a localização do motorista assim que o aplicativo conecta, mas não existe ainda um botão de "iniciar viagem" que mude o status oficial dela.
 - **Confirmar que o motorista viu um alerta** — o sistema já guarda essa informação na estrutura de dados, mas ainda não existe a tela/ação para o motorista confirmar "vi o alerta". Isso é importante para a empresa comprovar, se precisar, que o motorista foi avisado do risco antes de seguir viagem.
 - **Considerar neblina, deslizamento, vento forte e outros riscos climáticos** além de chuva e rio — hoje o sistema olha só para esses dois fatores; a expansão para outros tipos de risco está priorizada no roadmap (ver visão de produto).
 

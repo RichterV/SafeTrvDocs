@@ -39,6 +39,10 @@ Regra de hierarquia (CLAUDE.md seção 3): um usuário só cria outro com papel 
 - `409` se o e-mail já existe.
 - O usuário criado sempre pertence à mesma `account_id` de quem está criando — não é possível criar um usuário em outra conta.
 
+### `GET /users/me` — qualquer papel
+
+Retorna o usuário autenticado (mesmo formato do item de `GET /users`, com `roles`). Usado pelo frontend para saber os papéis de quem está logado — um Viajante não pode chamar `GET /users`.
+
 ### `GET /users` — Admin, Gerente
 
 Lista todos os usuários da própria conta.
@@ -81,11 +85,11 @@ Erros do pipeline:
 
 - `502 Bad Gateway` se o cálculo de rota (OpenRouteService) falhar — sem rota não há como segmentar nem avaliar risco.
 - Falha do INMET **não** derruba a criação da viagem — degrada graciosamente (loga warning, segue sem o piso mínimo de risco oficial).
-- Falha ao buscar rota alternativa (provedor indisponível, ou limite de 100km do ORS) **não** derruba a criação da viagem — degrada graciosamente, sem `alternative_route` na resposta.
+- Falha ao buscar rota alternativa (provedor indisponível, limites do ORS) **não** derruba a criação da viagem — degrada graciosamente, sem `alternative_route` na resposta.
 
 Retorna `201` com o objeto `Trip` completo: dados da viagem, lista de `segments` (cada um com seus `risk_assessments`), `risk_summary` (score máximo, médio, nível), `alternative_route` (ver abaixo, `null` se nenhuma alternativa foi sugerida) e `alerts` gerados.
 
-**`alternative_route`** (presente só quando: risco Alto/Crítico, sem paradas intermediárias, e uma alternativa com risco menor foi encontrada dentro do limite de 100km do provedor — ver [Serviços internos](services.md#sugestao-automatica-de-rota-alternativa)):
+**`alternative_route`** (presente só quando: risco Alto/Crítico e uma alternativa com risco estritamente menor foi encontrada — por desvio local em volta dos trechos de risco, em viagens de qualquer distância e com ou sem paradas, ou pelas rotas alternativas do provedor em viagens curtas sem paradas — ver [Serviços internos](services.md#sugestao-automatica-de-rota-alternativa)):
 
 ```json
 {
@@ -115,7 +119,33 @@ Lista viagens da própria conta, ordenadas por `scheduled_departure_at` decresce
 
 Retorna a viagem completa (mesmo formato do `POST`). `404` se não existir na conta do usuário, **ou** se existir mas o usuário for um Viajante que não é o dono dela — a resposta é o mesmo 404 nos dois casos, para não vazar a existência de viagens de outros usuários.
 
-## WebSocket (`/trips/{trip_id}/ws`)
+### `PATCH /trips/{trip_id}/status`
+
+Muda o status da viagem. Corpo: `{"status": "em_andamento" | "concluida" | "cancelada"}`. Retorna a viagem completa (mesmo formato do `GET /trips/{id}`), já com o novo status e o timestamp correspondente preenchido (`started_at` ao iniciar; `ended_at` ao concluir ou cancelar).
+
+Transições permitidas (regras em `app/services/trip_status.py`):
+
+| De → Para | Quem pode |
+|---|---|
+| `planejada` → `em_andamento` | somente o Viajante da viagem |
+| `em_andamento` → `concluida` | o Viajante da viagem, ou Admin/Gerente da conta |
+| `planejada` → `cancelada` | Admin/Gerente |
+| `em_andamento` → `cancelada` | Admin/Gerente |
+
+`concluida` e `cancelada` são estados finais. Um usuário com papéis acumulados (ex: Gerente que também é o Viajante da viagem) pode executar as transições de ambos.
+
+Erros:
+- `404` — viagem não existe na conta, ou o usuário é um Viajante que não é o dono dela (mesma regra do `GET`).
+- `409` — transição inexistente (ex: `planejada` → `concluida`, qualquer saída de `concluida`/`cancelada`, ou pedir o status atual).
+- `403` — a transição existe, mas o papel do usuário não permite (ex: Gerente tentando iniciar a viagem, Viajante tentando cancelar).
+
+A mudança é retransmitida em tempo real para quem estiver conectado no WebSocket da viagem (mensagem `{"type": "status", ...}` — ver [WebSocket](websocket.md#mudanca-de-status)).
+
+### `POST /trips/{trip_id}/ws-ticket` — quem pode acompanhar a viagem
+
+Emite um ticket de uso único (30 s, só esta viagem) para abrir o WebSocket: `{"ticket": "...", "expires_in_seconds": 30}`. Staff da conta e o Viajante da viagem; fora disso, `404`. Ver [WebSocket](websocket.md#autenticacao-ticket-de-uso-unico-nao-o-access-token).
+
+## WebSocket (`/trips/{trip_id}/ws?ticket=...`)
 
 Documentado separadamente em [WebSocket — rastreamento ao vivo](websocket.md), pois o protocolo (mensagens, autenticação por query param, broadcast) é bem diferente do resto da API REST.
 
@@ -126,6 +156,6 @@ Documentado separadamente em [WebSocket — rastreamento ao vivo](websocket.md),
 | `401` | Token ausente, inválido, expirado, ou tipo errado (ex: usar um refresh token como access token) |
 | `403` | Usuário autenticado, mas papel não permite a ação (ex: Viajante tentando criar veículo) |
 | `404` | Recurso não existe **ou** existe mas fora do escopo do usuário (conta diferente, ou viagem de outro Viajante) — nunca se distingue as duas situações na resposta |
-| `409` | Conflito de unicidade (e-mail já cadastrado) |
+| `409` | Conflito de unicidade (e-mail já cadastrado) ou transição de status de viagem inválida |
 | `422` | Corpo da requisição inválido (validação Pydantic) ou regra de negócio violada (papel incompatível, data fora da janela permitida) |
 | `502` | Dependência externa crítica falhou (OpenRouteService) |

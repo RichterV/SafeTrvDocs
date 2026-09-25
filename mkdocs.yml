@@ -32,6 +32,7 @@ nav:
       - WebSocket (rastreamento ao vivo): system/websocket.md
       - Serviços internos: system/services.md
       - Modelo de dados: system/data-model.md
+      - Frontend (Ionic + Angular): system/frontend.md
   - Setup:
       - Ambiente local: setup/local-dev.md
 

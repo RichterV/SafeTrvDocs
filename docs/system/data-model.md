@@ -63,11 +63,13 @@ Tabela N:N entre `users` e os papéis (`role` é um enum: `admin`, `gerente`, `v
 |---|---|---|
 | `account_id`, `created_by_id`, `traveler_id`, `vehicle_id` | UUID (FK) | `created_by_id` e `traveler_id` referenciam `users` com foreign keys distintas |
 | `cargo_type` | enum: `normal`, `perigosa`, `refrigerada` | default `normal` |
-| `status` | enum: `planejada`, `em_andamento`, `concluida`, `cancelada` | default `planejada`; **hoje nada no sistema transiciona esse status** (não há endpoint — ver backlog) |
+| `status` | enum: `planejada`, `em_andamento`, `concluida`, `cancelada` | default `planejada`; transicionado via `PATCH /trips/{id}/status` (regras em [Referência da API](api-reference.md#patch-tripstrip_idstatus)) |
 | `origin_label`/`lat`/`lng`, `destination_label`/`lat`/`lng` | string + float | |
 | `waypoints` | JSONB | lista de paradas opcionais, formato livre (`[{label, lat, lng}, ...]`) |
 | `scheduled_departure_at` | timestamptz | validado na criação: entre agora e `max_trip_planning_days` dias à frente |
 | `distance_km`, `duration_estimated_minutes` | float/int, nullable | vêm do resultado do OpenRouteService |
+| `started_at` | timestamptz, nullable | preenchido quando a viagem passa para `em_andamento` |
+| `ended_at` | timestamptz, nullable | preenchido quando a viagem passa para `concluida` ou `cancelada` |
 
 ### `route_segments`
 
