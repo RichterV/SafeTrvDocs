@@ -69,6 +69,19 @@ Toda viagem nasce como **planejada**. A partir daí:
 
 Quem estiver acompanhando a viagem (motorista e Gerente) vê a mudança de situação na hora.
 
+## O app do motorista durante a viagem
+
+As regras do aplicativo do Viajante durante a viagem estão em [App do Viajante](traveler-app.md). Elas cobrem:
+
+- início e conclusão automáticos;
+- pausa para descanso ou refeição;
+- reavaliação do clima a caminho;
+- alertas por voz;
+- o que fazer quando não há desvio;
+- funcionamento sem internet.
+
+Ainda são especificação, não implementada.
+
 ## O que o sistema ainda não faz (mas está no plano)
 
 - **Confirmar que o motorista viu um alerta** — o sistema já guarda essa informação na estrutura de dados, mas ainda não existe a tela/ação para o motorista confirmar "vi o alerta". Isso é importante para a empresa comprovar, se precisar, que o motorista foi avisado do risco antes de seguir viagem.

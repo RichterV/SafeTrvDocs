@@ -25,6 +25,7 @@ nav:
   - Negócio:
       - Visão geral: business/overview.md
       - Regras de negócio: business/rules.md
+      - App do Viajante: business/traveler-app.md
       - Índice de risco: business/risk-index.md
   - Sistema:
       - Visão geral da arquitetura: system/overview.md
