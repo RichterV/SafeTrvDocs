@@ -58,6 +58,22 @@ A API sobe em `http://localhost:8000` — documentação interativa em `/docs`.
 
 `WS ws://localhost:8000/api/v1/trips/{trip_id}/ws?ticket=<ticket>` — o ticket (uso único, 30 s) vem de `POST /api/v1/trips/{trip_id}/ws-ticket`, chamado com o access token no header; o access token em si nunca vai na URL. Protocolo completo em [WebSocket — rastreamento ao vivo](../system/websocket.md).
 
+## Dados de demonstração
+
+Para ter o app com conteúdo realista (equipe, frota, viagens passadas, em andamento e planejadas, alertas, rotas alternativas, rastros de GPS):
+
+```bash
+cd backend
+uv run python scripts/seed_demo.py            # banco de desenvolvimento
+uv run python scripts/seed_demo.py --remove   # só apaga os dados de demonstração
+```
+
+Cria duas empresas de demonstração ("Transportadora Verde Vale (demo)" e "Frio Sul Logística (demo)"). Todos os usuários têm a senha **`demo12345`** e e-mails `<nome>@demo.safetrv.com.br` — ex: `marina@` (admin), `rafael@` (gerente), `joao@` (viajante); a lista completa sai no fim da execução. Rodar de novo apaga e recria só essas contas — as demais contas do banco não são tocadas.
+
+Funciona offline: os trajetos (estradas reais) vêm de `scripts/seed_data/demo_routes.json`, e o clima é simulado. Para a distância a rio entrar no cálculo, importe antes a malha de rios (`import_geodata.py`, ver acima). Para baixar os trajetos de novo (ex: ao adicionar rotas), `uv run python scripts/fetch_demo_routes.py` (precisa de rede e da chave do ORS). `./menu.sh` opção 13 faz o mesmo que o primeiro comando.
+
+**Não use em produção.**
+
 ## Frontend (Ionic + Angular)
 
 Com a API no ar:
