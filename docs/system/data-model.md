@@ -63,13 +63,28 @@ Tabela N:N entre `users` e os papéis (`role` é um enum: `admin`, `gerente`, `v
 |---|---|---|
 | `account_id`, `created_by_id`, `traveler_id`, `vehicle_id` | UUID (FK) | `created_by_id` e `traveler_id` referenciam `users` com foreign keys distintas |
 | `cargo_type` | enum: `normal`, `perigosa`, `refrigerada` | default `normal` |
-| `status` | enum: `planejada`, `em_andamento`, `concluida`, `cancelada` | default `planejada`; transicionado via `PATCH /trips/{id}/status` (regras em [Referência da API](api-reference.md#patch-tripstrip_idstatus)) |
+| `status` | enum: `planejada`, `em_andamento`, `pausada`, `concluida`, `cancelada` | default `planejada`; transicionado via `PATCH /trips/{id}/status` (regras em [Referência da API](api-reference.md#patch-tripstrip_idstatus)) |
 | `origin_label`/`lat`/`lng`, `destination_label`/`lat`/`lng` | string + float | |
 | `waypoints` | JSONB | lista de paradas opcionais, formato livre (`[{label, lat, lng}, ...]`) |
 | `scheduled_departure_at` | timestamptz | validado na criação: entre agora e `max_trip_planning_days` dias à frente |
 | `distance_km`, `duration_estimated_minutes` | float/int, nullable | vêm do resultado do OpenRouteService |
 | `started_at` | timestamptz, nullable | preenchido quando a viagem passa para `em_andamento` |
 | `ended_at` | timestamptz, nullable | preenchido quando a viagem passa para `concluida` ou `cancelada` |
+| `started_automatically`, `completed_automatically` | bool | início/conclusão feitos sozinhos pelo celular — só esses podem ser desfeitos (RN-13/RN-61) |
+| `risk_reevaluated_at` | timestamptz, nullable | última reavaliação do risco durante a viagem; o acompanhamento usa para saber quando reavaliar de novo (15 min) |
+
+### `trip_pauses`
+
+Uma linha por pausa da viagem (RN-20 a RN-27).
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `trip_id` | UUID (FK) | indexado |
+| `reason` | enum: `descanso`, `refeicao`, `abastecimento`, `carga_descarga`, `aguardando_clima`, `outro` | |
+| `note` | string(120), nullable | obrigatório quando `reason = outro` |
+| `lat`, `lng` | float, nullable | onde a pausa começou — o rastro de posições para durante a pausa |
+| `started_at`, `ended_at` | timestamptz | `ended_at` nulo = pausa em curso |
+| `long_pause_notified_at` | timestamptz, nullable | quando o gerente foi avisado da pausa longa (RN-27) — o aviso sai uma vez por pausa |
 
 ### `route_segments`
 
@@ -77,11 +92,11 @@ Um trecho da rota (`sequence` define a ordem). `start_lat/lng`, `end_lat/lng` in
 
 ### `segment_risk_assessments`
 
-Uma avaliação de risco por segmento — hoje sempre 1:1 com `route_segments` (calculada uma única vez, na criação da viagem), mas o modelo permite histórico (múltiplas avaliações por segmento ao longo do tempo, para quando o índice for recalculado conforme a viagem se aproxima — CLAUDE.md seção 4). Guarda os insumos brutos (`rain_probability`, `rain_intensity_mm`, `river_distance_m`, `official_alert_active`) além do `score` e `risk_level` finais — importante para auditoria/explicabilidade do índice.
+Histórico de avaliações de risco por segmento: a primeira é feita no planejamento, e cada reavaliação durante a viagem acrescenta uma nova (só para os trechos reavaliados). A API as devolve da mais recente para a mais antiga (`order_by calculated_at desc` no relacionamento), então `risk_assessments[0]` é a vigente. Guarda os insumos brutos (`rain_probability`, `rain_intensity_mm`, `river_distance_m`, `official_alert_active`) além do `score` e `risk_level` finais — importante para auditoria/explicabilidade do índice.
 
 ### `trip_risk_summaries`
 
-1:1 com `trips` (`trip_id` é `unique`). Agrega `score_max` (usado como o nível de risco geral da viagem — CLAUDE.md seção 5: "pior segmento") e `score_avg` como contexto adicional.
+1:1 com `trips` (`trip_id` é `unique`). Agrega `score_max` (usado como o nível de risco geral da viagem — CLAUDE.md seção 5: "pior segmento") e `score_avg` como contexto adicional. Recalculado a cada reavaliação, com a avaliação mais recente de cada trecho.
 
 ### `alternative_routes`
 
@@ -99,12 +114,22 @@ Uma avaliação de risco por segmento — hoje sempre 1:1 com `route_segments` (
 
 | Coluna | Tipo |
 |---|---|
-| `type` | enum: `chuva`, `rio`, `rota_alternativa`, `oficial` |
+| `type` | enum: `chuva`, `rio`, `rota_alternativa`, `oficial`, `pausa_longa` |
 | `severity` | enum `RiskLevel` (`baixo`..`critico`) |
-| `message` | texto livre |
-| `acknowledged`, `acknowledged_at` | suporte a "registro de reconhecimento de alerta" (Horizonte 1 do backlog de produto) — campos já existem no modelo, mas **nenhum endpoint ainda os atualiza** |
+| `message` | texto livre, escrito para ser lido em voz alta |
+| `audience` | enum: `todos` (default), `staff` — `staff` não aparece para o Viajante |
+| `segment_sequence` | int, nullable — primeiro trecho a que o alerta se refere |
+| `inmet_alert_id` | int, nullable — id do aviso do INMET que gerou o alerta; evita repetir o mesmo aviso (RN-33) |
+| `read_aloud_at` | timestamptz, nullable — o app leu em voz alta |
+| `acknowledged`, `acknowledged_at` | "Ciente" (RN-44) |
+| `decision`, `decided_at` | enum nullable: `usar_alternativa`, `seguir_rota`, `parar` (RN-40 a RN-42) |
 
-Gerados automaticamente por `trip_planner.py`: `oficial`/`chuva` quando um segmento atinge Alto/Crítico, e `rota_alternativa` quando uma rota com risco menor é encontrada (ver `alternative_routes` acima). `rio` existe no enum mas ainda não é usado.
+Enviado = `created_at`. Quem gera:
+
+- `trip_planner.py`, no planejamento: `oficial`/`chuva` quando um segmento atinge Alto/Crítico, e `rota_alternativa` quando uma rota com risco menor é encontrada (ver `alternative_routes` acima);
+- `trip_monitor.py`, durante a viagem: `chuva`/`rio` quando trechos sobem para Alto/Crítico, `oficial` para um aviso do INMET novo no caminho, e `pausa_longa` (`audience = staff`) para a pausa de mais de 14 h.
+
+Os enums são gravados pelo **nome** (`TODOS`, `EM_ANDAMENTO`), padrão do SQLAlchemy — relevante para `server_default` em migrações.
 
 ## Rastreamento ao vivo
 

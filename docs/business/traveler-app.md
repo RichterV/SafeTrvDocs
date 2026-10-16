@@ -1,6 +1,6 @@
 # App do Viajante — regras de negócio
 
-> **Status: especificação, ainda não implementada.** Definida em 2026-09-25 a partir de decisões do responsável pelo produto. Descreve **o que** o app do motorista deve fazer, não **como** construir. Os números (distâncias, tempos) são valores iniciais, ajustáveis depois de testes com motoristas — ver [Parâmetros](#parametros-ajustaveis).
+> **Status: parcialmente implementada** — a parte do servidor e da tela web desde 2026-09-26; o app nativo, ainda não. Ver [O que já está implementado](#o-que-ja-esta-implementado). Definida em 2026-09-25 a partir de decisões do responsável pelo produto. Descreve **o que** o app do motorista deve fazer, não **como** construir. Os números (distâncias, tempos) são valores iniciais, ajustáveis depois de testes com motoristas — ver [Parâmetros](#parametros-ajustaveis).
 
 Esta página cobre o aplicativo que o **Viajante** (motorista) usa durante a viagem, no celular. Para as regras gerais do sistema (papéis, planejamento, índice de risco), ver [Regras de negócio](rules.md).
 
@@ -89,7 +89,7 @@ O motivo e a duração ficam no histórico da viagem, e o gerente vê as duas co
 **RN-22 — Durante a pausa.**
 
 - O app registra **onde** a pausa começou e mostra ao gerente o veículo como "parado — motivo X desde HH:MM".
-- Não envia o rastro contínuo de posições enquanto a pausa durar, para poupar bateria e preservar a privacidade no pernoite.
+- Não envia o rastro contínuo de posições enquanto a pausa durar, para poupar bateria e preservar a privacidade no pernoite. Só a posição do início da pausa é enviada (confirmado em 2026-09-26).
 - Continua observando, só no celular, se o veículo voltou a andar.
 
 **RN-23 — Retomar.** A viagem volta a ficar em andamento de dois jeitos:
@@ -109,6 +109,8 @@ O motivo e a duração ficam no histórico da viagem, e o gerente vê as duas co
 O app **não bloqueia** a viagem; ele lembra e registra.
 
 **RN-26 — Quem pausa.** Só o motorista da viagem pausa e retoma. O gerente vê a pausa, mas não a controla. Cancelar continua sendo só do gerente (regra atual).
+
+**RN-27 — Pausa longa.** A pausa não tem limite de duração e o sistema nunca muda o status da viagem sozinho por causa dela. Mas, se a viagem ficar pausada por mais de **14 horas** (as 11 h de descanso entre jornadas, com folga), o gerente recebe **um** aviso: "viagem pausada há mais de 14 h — motivo X desde HH:MM". Serve para pegar uma pausa esquecida. O aviso sai uma vez por pausa; o motorista não é avisado.
 
 ## 5. Acompanhamento do clima durante a viagem
 
@@ -130,7 +132,7 @@ O gerente é avisado **apenas se o novo caminho tiver risco maior** que o planej
 
 - um trecho à frente passa a ter risco **Alto ou Crítico**, e antes não tinha;
 - um trecho que já era Alto sobe para **Crítico**;
-- surge um **aviso oficial do INMET** novo cobrindo o caminho.
+- surge um **aviso oficial do INMET** novo cobrindo o caminho, de qualquer severidade. A mensagem diz qual é (Perigo Potencial, Perigo ou Grande Perigo), e o nível de risco do trecho segue a graduação das [regras gerais](rules.md).
 
 **RN-33 — Sem repetição à toa.** O mesmo trecho com o mesmo nível de risco não gera novo alerta a cada reavaliação. Só gera se o risco **subir** ou se for o **lembrete de proximidade** (RN-43). Quando o risco de um trecho **diminui**, o app atualiza o mapa e a lista, sem notificação sonora.
 
@@ -143,10 +145,12 @@ O gerente é avisado **apenas se o novo caminho tiver risco maior** que o planej
 
 A decisão é **do motorista**, porque é ele quem vê a estrada. O sistema não troca a rota sozinho nem espera aprovação. A escolha fica registrada e **o gerente é avisado** do que foi decidido.
 
+**Limite de custo do desvio** (decidido em 2026-10-10, vale também para a rota alternativa do planejamento): o sistema só sugere um caminho alternativo se ele custar **no máximo +30% do tempo da viagem e no máximo +60 minutos**. Um desvio mais caro que isso não é oferecido: o alerta segue como "sem desvio" (RN-41), com a parada segura.
+
 **RN-41 — Não existe desvio.** Quando não há caminho alternativo com risco menor, o alerta:
 
 - avisa para **dirigir com cautela** no trecho, com a orientação adequada ao tipo de risco: por exemplo, reduzir a velocidade e aumentar a distância na chuva forte, ou atenção a pontos de alagamento perto de rio;
-- **sugere uma parada segura antes do trecho de risco**, no último ponto de parada razoável antes dele (posto ou cidade). Quando a previsão permitir, também diz **quando o tempo deve melhorar** (ex: "chuva forte até ~16h");
+- **sugere uma parada segura antes do trecho de risco**: o último **posto de combustível ou área urbana** antes do trecho, buscado no OpenStreetMap ao longo da rota (decidido em 2026-10-10; não depende de cadastro). Quando a previsão permitir, também diz **quando o tempo deve melhorar** (ex: "chuva forte até ~16h");
 - **avisa o gerente** de que o motorista vai passar por um trecho de risco sem alternativa;
 - exige **"Ciente"** (RN-44).
 
@@ -198,6 +202,7 @@ Valores iniciais. Devem ser calibrados com testes reais e, no futuro, podem vira
 | RN-24 | Pausa a partir da qual o risco é recalculado ao retomar | 30 min |
 | RN-25 | Direção contínua máxima / descanso mínimo (Lei 13.103/2015) | 5h30 / 30 min |
 | RN-25 | Antecedência do lembrete de descanso | 30 min |
+| RN-27 | Pausa a partir da qual o gerente é avisado | 14 h |
 | RN-30 | Intervalo da reavaliação do clima | 15 min |
 | RN-30 | Horizonte da reavaliação | próximas 3 h |
 | RN-31 | Distância / tempo para considerar "fora da rota" | 1 km / 5 min |
@@ -217,12 +222,55 @@ Para quem vai implementar — diferenças em relação ao que existe hoje:
 - **Início e conclusão automáticos** pelo celular do motorista. São compatíveis com as regras atuais de quem pode mudar o status: é o próprio viajante agindo, pelo app.
 - **Registro de direção e descanso** para a Lei do Motorista (hoje no backlog de Horizonte 2).
 
+## O que já está implementado
+
+Em 2026-09-26, a parte do **servidor** e da **tela web** (detalhes técnicos em [Referência da API](../system/api-reference.md#patch-tripstrip_idstatus) e [Serviços internos](../system/services.md#acompanhamento-durante-a-viagem-trip_monitorpy)):
+
+| Regra | Situação |
+|---|---|
+| RN-10 início manual | ✅ |
+| RN-11 início automático | ⏳ servidor pronto (aceita "foi automático"); a detecção de movimento é do app nativo |
+| RN-13 desfazer o início automático (5 min) | ✅ servidor; o botão fica para o app nativo |
+| RN-14 uma viagem de cada vez | ✅ |
+| RN-15 recalcular o risco ao iniciar | ✅ |
+| RN-20, RN-21, RN-22, RN-26 pausa com motivo, só pelo motorista, só a posição do início | ✅ |
+| RN-23 retomar | ✅ manual; o automático é do app nativo |
+| RN-24 recalcular ao retomar depois de 30 min | ✅ |
+| RN-25 Lei do Motorista (5h30 / 30 min) | ❌ ainda não |
+| RN-27 aviso de pausa longa (14 h) | ✅ |
+| RN-30 reavaliação a cada 15 min e com aviso novo do INMET | ✅ (o acompanhamento roda a cada 5 min; cada viagem é reavaliada a cada 15 min, ou na hora se surgir um aviso novo no caminho) |
+| RN-31 fora da rota planejada | ❌ ainda não |
+| RN-32, RN-33 quando avisar, sem repetição | ✅ (trechos seguidos viram um alerta só) |
+| RN-40 caminho alternativo durante a viagem | ❌ ainda não — hoje o alerta é sempre o de "sem desvio" |
+| RN-41 sem desvio: cautela | ✅ o texto orienta como dirigir; falta a parada segura sugerida e "quando o tempo melhora" |
+| RN-42 parar é decisão do motorista | ✅ registro da decisão; o app pausa com "aguardando o clima melhorar" |
+| RN-43 lembrete perto do trecho | ❌ app nativo (depende do GPS em segundo plano) |
+| RN-44 lido em voz alta e "Ciente" | ✅ registro das etapas; na web o alerta é lido em voz alta com o app aberto |
+| RN-45 o gerente vê tudo | ✅ ao vivo |
+| RN-50 a RN-53 offline | ❌ app nativo |
+| RN-60, RN-61 conclusão automática e desfazer (30 min) | ⏳ servidor pronto; a detecção é do app nativo |
+
+Decisões tomadas na implementação, confirmadas pelo responsável pelo produto em 2026-10-10:
+
+- **Trechos seguidos que sobem de risco viram um alerta só**, em vez de um alerta por trecho.
+- **Os horários de passagem são recalculados pelo atraso real**, não pela velocidade instantânea: se o motorista está 30 min atrasado em relação ao plano, todo o resto anda 30 min. A velocidade do momento oscila demais (trânsito, paradas curtas) para prever horas à frente.
+- **Só avisos de chuva/tempestade do INMET contam** para o índice e para a RN-32 (ver as [regras gerais](rules.md)). Aviso de **vendaval** fica de fora por enquanto: entra junto com o fator "vento forte" do roadmap, que considera o tipo de veículo.
+
 ## Pontos em aberto
 
 Pontos para confirmar antes de implementar:
 
-1. **Rastro durante a pausa (RN-22).** Hoje só a localização do início da pausa é enviada. Se a empresa quiser saber onde o veículo está durante o pernoite (por segurança da carga, por exemplo), isso muda.
-2. **"Parada segura" (RN-41)** hoje significa "o último posto ou cidade antes do trecho". Uma lista curada de pontos de parada seguros (Horizonte 2 do backlog) melhoraria muito essa sugestão.
-3. **Pernoite e a regra das 11 h entre jornadas.** A Lei do Motorista também exige 11 h de descanso entre jornadas. A RN-25 cobre só o descanso de 30 min a cada 5h30; incluir as 11 h depende de o sistema conhecer a jornada, e não só a viagem.
-4. **Viagem pausada por muito tempo.** Não há limite de duração da pausa, nem aviso ao gerente por pausa longa — isso foi uma escolha explícita. Uma pausa esquecida, porém, deixaria a viagem "pausada" indefinidamente.
-5. **Piso de risco do aviso oficial do INMET.** Hoje é Alto, e a página de regras gerais fala em Crítico. Isso afeta quais alertas a RN-32 dispara. Decisão pendente, registrada no backlog.
+1. **Pernoite e a regra das 11 h entre jornadas.** A Lei do Motorista também exige 11 h de descanso entre jornadas. A RN-25 cobre só o descanso de 30 min a cada 5h30; incluir as 11 h depende de o sistema conhecer a jornada, e não só a viagem.
+
+Decididos em 2026-09-26:
+
+- **Rastro durante a pausa:** só a posição do início da pausa (RN-22).
+- **Pausa esquecida:** aviso ao gerente depois de 14 h (RN-27).
+- **Piso do aviso oficial do INMET:** graduado pela severidade do aviso (ver as [regras gerais](rules.md)).
+
+Decididos em 2026-10-10:
+
+- **Limite de custo do desvio:** no máximo +30% do tempo da viagem e +60 min (RN-40).
+- **Parada segura:** último posto ou área urbana antes do trecho, pelo OpenStreetMap (RN-41). Uma lista curada de pontos de parada (Horizonte 2 do backlog) pode complementar depois.
+- **Vendaval:** fora do índice por enquanto.
+- **Horários pelo atraso real** e **trechos seguidos = um alerta**: confirmados.

@@ -39,11 +39,35 @@ Uma viagem pode ser cadastrada com até **7 dias de antecedência**. Quanto mais
 | 🟢 **Baixo** | Sem sinais relevantes de risco climático no trajeto. |
 | 🟡 **Médio** | Alguma chance de chuva ou proximidade de rio, mas ainda dentro do esperado — vale acompanhar, não é motivo para adiar a viagem. |
 | 🟠 **Alto** | Combinação de fatores (chuva forte, proximidade de rio, carga sensível, horário noturno) que justifica atenção redobrada — o sistema já sinaliza que vale considerar um caminho alternativo. |
-| 🔴 **Crítico** | Situação de risco elevado, incluindo os casos em que há um **aviso oficial do governo** (INMET) de tempestade severa cobrindo aquele trecho no horário da viagem — recomenda-se fortemente rever a rota ou o horário antes de sair. |
+| 🔴 **Crítico** | Situação de risco elevado, incluindo os casos em que há um **aviso oficial do governo** (INMET) de "Grande Perigo" cobrindo aquele trecho no horário da viagem — recomenda-se fortemente rever a rota ou o horário antes de sair. |
 
-**Um detalhe importante:** se o governo (INMET) já emitiu um aviso oficial de tempestade severa cobrindo a área e o horário por onde o veículo vai passar, o sistema **nunca** vai mostrar aquele trecho como "Baixo" ou "Médio" — mesmo que os outros cálculos apontassem um risco menor, um aviso oficial ativo sempre eleva a classificação para pelo menos "Alto". A lógica é: se o governo já emitiu um alerta oficial, o sistema não vai contradizer isso.
+**Um detalhe importante:** se o governo (INMET) emitiu um aviso oficial cobrindo a área e o horário por onde o veículo vai passar, o trecho recebe um **nível mínimo** de risco, conforme a gravidade do aviso:
+
+| Aviso do INMET | Cor do aviso | Nível mínimo do trecho |
+|---|---|---|
+| Perigo Potencial | amarelo | 🟡 Médio |
+| Perigo | laranja | 🟠 Alto |
+| Grande Perigo | vermelho | 🔴 Crítico |
+
+Só contam os avisos de **chuva ou tempestade** (ex: "Tempestade", "Chuvas Intensas", "Acumulado de Chuva"). Avisos de onda de calor, baixa umidade, geada ou vento ainda não entram no índice, que hoje olha só para chuva e rio.
+
+Se os outros cálculos já apontarem um risco maior, vale o maior — o aviso só sobe o nível, nunca baixa. A lógica é: se o governo já emitiu um alerta oficial, o sistema não vai contradizer isso. Avisos amarelos são muito comuns e costumam cobrir estados inteiros, por isso levam só a "Médio": não geram sozinhos um alerta de risco nem uma busca de rota alternativa.
 
 **Outro detalhe:** viagens transportando **carga perigosa** (combustíveis, químicos) recebem uma nota de risco mais alta nos trechos onde já existe risco de alagamento — o mesmo nível de chuva/proximidade de rio pesa mais quando a carga em si já é um risco ambiental caso algo dê errado. Viagens à noite também recebem um pequeno acréscimo no risco, porque chuva combinada com pouca visibilidade noturna aumenta a chance de acidente.
+
+## O que aparece no mapa da viagem
+
+O mapa mostra o caminho colorido pela cor do risco de cada trecho e, quando existe, a rota alternativa sugerida (tracejada). O risco nunca depende só da cor: cada nível tem também uma forma de placa (círculo para Baixo, triângulo para Médio, losango para Alto, octógono para Crítico), a linha fica mais grossa quanto maior o risco e os trechos Alto/Crítico ganham um marcador com a forma.
+
+**Travessia de rio.** Em cada ponto onde o caminho **cruza um rio** (em geral uma ponte), o mapa mostra um **ícone de rio** sobre a rota. Assim o Gerente e o motorista enxergam de relance onde estão os pontos que podem alagar, sem precisar abrir trecho por trecho.
+
+- Contam os mesmos rios usados no cálculo do risco: os de porte relevante. Córregos e riachos pequenos ficam de fora, senão o mapa ficaria coberto de ícones.
+- Ao tocar no ícone aparecem o nome do rio (quando a base oficial tem o nome), o horário previsto de passagem e o nível de risco daquele trecho nesse horário.
+- O ícone aparece mesmo quando o risco do trecho está Baixo. Ele indica que ali tem um rio, não que há perigo. O perigo continua sendo mostrado pela cor do trecho e pelos alertas.
+- Vale para a rota planejada e para a rota alternativa, e aparece tanto no painel do Gerente quanto no app do motorista.
+- Um caminho que corre **ao lado** de um rio sem atravessá-lo não ganha ícone. Essa proximidade já entra na nota de risco do trecho.
+
+*Ainda não implementado.*
 
 ## Sugestão automática de rota alternativa
 
@@ -54,18 +78,21 @@ Funciona para viagens de **qualquer distância** e **com ou sem paradas** no mei
 **Limitações de hoje:**
 - Se o trecho perigoso fica **colado na origem, no destino ou numa parada**, não tem como desviar dele — o veículo precisa passar por ali de qualquer jeito.
 - Numa viagem com muitos trechos perigosos, o sistema tenta desviar dos **4 piores**; os demais continuam como na rota original.
-- Hoje o sistema escolhe a alternativa com **menor risco**, sem limite de quanto tempo a mais ela leva. Cabe ao Gerente avaliar se o desvio compensa.
+- Hoje o sistema escolhe a alternativa com **menor risco**, sem limite de quanto tempo a mais ela leva. **Decidido em 2026-10-10 (a implementar):** só sugerir alternativa que custe no máximo +30% do tempo da viagem e no máximo +60 minutos; acima disso, nenhuma alternativa é sugerida.
 - Quando um aviso oficial do governo cobre uma área muito grande, é comum que **nenhuma alternativa seja encontrada** — se toda a região ao redor está sob o mesmo aviso, qualquer caminho alternativo teria o mesmo risco mínimo, então o sistema corretamente não sugere trocar de rota "só para trocar".
 
 ## Início, fim e cancelamento de uma viagem
 
 Toda viagem nasce como **planejada**. A partir daí:
 
-- **Só o motorista (Viajante) inicia a viagem** — é ele quem sabe quando de fato saiu. A partir desse momento a viagem fica **em andamento** e o sistema registra o horário real de início.
+- **Só o motorista (Viajante) inicia a viagem** — é ele quem sabe quando de fato saiu. A partir desse momento a viagem fica **em andamento** e o sistema registra o horário real de início. Ao iniciar, o risco do caminho é recalculado com o horário real de saída.
+- **Um motorista tem no máximo uma viagem em andamento (ou pausada) por vez.**
+- **O motorista pode pausar a viagem** (descanso/pernoite, refeição, abastecimento, carga/descarga, aguardando o clima melhorar ou outro motivo) e retomá-la depois. Durante a pausa o trajeto não é registrado, só o lugar onde ela começou. Se a pausa passar de 14 horas, o gerente é avisado uma vez. Detalhes em [App do Viajante](traveler-app.md#4-pausa-dormir-comer-abastecer).
+- **Durante a viagem, o risco do caminho à frente é reavaliado** a cada 15 minutos e sempre que o governo publica um aviso novo que alcança o caminho. Se um trecho à frente passar a Alto ou Crítico, o motorista é avisado.
 - **A localização em tempo real só é registrada com a viagem em andamento.** Antes de iniciar ou depois de encerrar, o aplicativo pode continuar aberto, mas a posição do motorista não é gravada — assim o histórico de trajeto reflete só o período real da viagem.
 - **Concluir** a viagem pode ser feito pelo motorista ou pelo Gerente/Administrador (o Gerente pode encerrar caso o motorista esqueça).
 - **Cancelar** é decisão da gestão: só Gerente ou Administrador cancelam, tanto antes de sair quanto no meio do caminho. O motorista não cancela sozinho uma viagem que foi planejada para ele.
-- Uma viagem concluída ou cancelada **não pode ser reaberta** — se precisar refazer o trajeto, cadastra-se uma nova viagem.
+- Uma viagem concluída ou cancelada **não pode ser reaberta** — se precisar refazer o trajeto, cadastra-se uma nova viagem. A exceção é o próprio celular ter concluído sozinho: aí o motorista tem 30 minutos para desfazer ("Ainda não cheguei").
 
 Quem estiver acompanhando a viagem (motorista e Gerente) vê a mudança de situação na hora.
 
@@ -80,11 +107,10 @@ As regras do aplicativo do Viajante durante a viagem estão em [App do Viajante]
 - o que fazer quando não há desvio;
 - funcionamento sem internet.
 
-Ainda são especificação, não implementada.
+A parte do sistema (servidor e tela web) já funciona: pausa, reavaliação do clima a caminho, alertas com "ciente" e aviso de pausa longa. Falta o app nativo do celular (segundo plano, voz com a tela bloqueada, início/conclusão automáticos, offline) — ver o que já está pronto em [App do Viajante](traveler-app.md#o-que-ja-esta-implementado).
 
 ## O que o sistema ainda não faz (mas está no plano)
 
-- **Confirmar que o motorista viu um alerta** — o sistema já guarda essa informação na estrutura de dados, mas ainda não existe a tela/ação para o motorista confirmar "vi o alerta". Isso é importante para a empresa comprovar, se precisar, que o motorista foi avisado do risco antes de seguir viagem.
 - **Considerar neblina, deslizamento, vento forte e outros riscos climáticos** além de chuva e rio — hoje o sistema olha só para esses dois fatores; a expansão para outros tipos de risco está priorizada no roadmap (ver visão de produto).
 
 ## Modelo comercial

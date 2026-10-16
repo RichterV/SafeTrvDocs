@@ -36,6 +36,7 @@ nav:
       - Frontend (Ionic + Angular): system/frontend.md
   - Setup:
       - Ambiente local: setup/local-dev.md
+      - Publicação no servidor: setup/server.md
 
 markdown_extensions:
   - admonition

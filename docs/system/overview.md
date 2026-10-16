@@ -33,7 +33,8 @@ app/
       auth.py          # signup, login, refresh
       users.py         # CRUD de usuários com hierarquia de papéis
       vehicles.py      # CRUD de veículos
-      trips.py         # planejamento e consulta de viagens
+      trips.py         # planejamento, consulta e mudança de status de viagens
+      alerts.py        # ciclo de vida do alerta: lido em voz alta, ciente, decisão
       live_tracking.py # WebSocket de rastreamento ao vivo
       router.py        # agrega todos os routers sob /api/v1
   services/
@@ -44,6 +45,10 @@ app/
     geo.py                  # haversine e distância ao rio mais próximo (PostGIS)
     risk.py                 # fórmula do score de risco por segmento
     trip_planner.py         # orquestra todo o fluxo de POST /trips (rota → segmentos → clima → risco → persistência)
+    trip_status.py          # regras puras de transição de status (quem pode, prazos para desfazer)
+    trip_lifecycle.py       # aplica a mudança de status: pausa, desfazer, uma viagem ativa por motorista
+    reevaluation.py         # cálculos puros da reavaliação: posição na rota, novos horários, alertas
+    trip_monitor.py         # reavaliação do risco durante a viagem + aviso de pausa longa (roda no lifespan)
     connection_manager.py   # registro em memória das conexões WebSocket ativas por viagem
 scripts/
   import_geodata.py   # baixa/importa estados, municípios e rios para o PostGIS

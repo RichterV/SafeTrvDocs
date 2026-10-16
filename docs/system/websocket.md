@@ -40,7 +40,7 @@ No handshake, o servidor:
 { "lat": -23.55052, "lng": -46.633308, "speed_kmh": 60, "heading_degrees": 270 }
 ```
 
-Posições só são aceitas enquanto a viagem está `em_andamento` — com a viagem `planejada`, `concluida` ou `cancelada`, o servidor responde `{"type": "error", "detail": "Posições só são aceitas com a viagem em andamento"}`, não persiste nada e mantém a conexão aberta. O status é conferido no banco a cada mensagem, então a regra vale mesmo que o status mude com o socket já aberto.
+Posições só são aceitas enquanto a viagem está `em_andamento` — com a viagem `planejada`, `pausada`, `concluida` ou `cancelada`, o servidor responde `{"type": "error", "detail": "Posições só são aceitas com a viagem em andamento"}`, não persiste nada e mantém a conexão aberta. O status é conferido no banco a cada mensagem, então a regra vale mesmo que o status mude com o socket já aberto.
 
 Validado por `LivePositionIn` (`app/schemas/live_position.py`): `lat` ∈ [-90, 90], `lng` ∈ [-180, 180], `speed_kmh` ≥ 0 (opcional), `heading_degrees` ∈ [0, 360) (opcional). Mensagem inválida → servidor responde `{"type": "error", "detail": "Mensagem inválida"}` e mantém a conexão aberta (não desconecta por payload malformado).
 
@@ -72,10 +72,50 @@ Quando o status da viagem muda via `PATCH /trips/{id}/status`, o servidor envia 
 {
   "type": "status",
   "trip_id": "uuid",
-  "status": "em_andamento",
-  "changed_at": "2026-09-25T22:14:05.578628+00:00"
+  "status": "pausada",
+  "changed_at": "2026-09-26T16:40:05.578628+00:00",
+  "pause": {
+    "id": "uuid",
+    "reason": "refeicao",
+    "note": null,
+    "lat": -23.2,
+    "lng": -46.9,
+    "started_at": "2026-09-26T16:40:05.578628+00:00",
+    "ended_at": null,
+    "long_pause_notified_at": null
+  }
 }
 ```
+
+`pause` é a pausa em curso (mesmo formato de `pauses` em `GET /trips/{id}`), ou `null` fora de uma pausa. Durante a pausa o Viajante não envia posições (RN-22).
+
+### Alertas
+
+Um alerta **novo** (gerado pela reavaliação do risco, ou o aviso de pausa longa) e um alerta **que mudou** (lido em voz alta, ciente, decisão — ver [Referência da API](api-reference.md#ciclo-de-vida-do-alerta-post-tripstrip_idalertsalert_id)) chegam no mesmo formato. O cliente faz *upsert* pelo `id`:
+
+```json
+{ "type": "alert", "alert": { "id": "uuid", "type": "chuva", "severity": "alto", "message": "Risco alto à frente, nos trechos 3 a 5, …", "audience": "todos", "...": "mesmos campos de AlertRead" } }
+```
+
+Alertas com `audience: "staff"` só vão para os sockets de Admin/Gerente — o `connection_manager` sabe, por conexão, se ela é de staff.
+
+### Reavaliação do risco
+
+Depois de cada reavaliação do risco durante a viagem (ao iniciar, ao retomar depois de uma pausa longa, a cada 15 min, ou quando surge um aviso novo do INMET no caminho):
+
+```json
+{
+  "type": "risk",
+  "trip_id": "uuid",
+  "risk_level": "alto",
+  "previous_risk_level": "baixo",
+  "score_max": 55.0,
+  "score_avg": 31.2,
+  "calculated_at": "2026-09-26T17:02:05+00:00"
+}
+```
+
+Os trechos (horários de passagem e avaliações) mudaram; o cliente recarrega a viagem.
 
 ### Ao conectar
 
@@ -83,7 +123,7 @@ Qualquer conexão nova (Viajante ou Staff) recebe primeiro o status atual da via
 
 ## Registro de conexões — limitação conhecida
 
-`app/services/connection_manager.py` mantém um dicionário em memória (`trip_id → set[WebSocket]`) **por processo**. Funciona perfeitamente para desenvolvimento e para uma única instância do backend. Para rodar múltiplas instâncias (escala horizontal), seria necessário um pub/sub compartilhado entre processos (ex: Redis Pub/Sub) — hoje não implementado, não é necessário para o volume esperado do MVP.
+`app/services/connection_manager.py` mantém um dicionário em memória (`trip_id → {WebSocket: é staff?}`) **por processo**. Funciona perfeitamente para desenvolvimento e para uma única instância do backend. Para rodar múltiplas instâncias (escala horizontal), seria necessário um pub/sub compartilhado entre processos (ex: Redis Pub/Sub) — hoje não implementado, não é necessário para o volume esperado do MVP.
 
 ## O que foi validado (2026-09-18)
 
@@ -100,6 +140,10 @@ Validado também em 2026-09-25, junto com o endpoint de status: posição rejeit
 ## Testes automatizados
 
 `backend/tests/integration/test_live_tracking_ws.py` cobre o protocolo contra o Postgres real: pedido de ticket (sem login, outra conta), handshake recusado (ticket inventado, access token no lugar do ticket, ticket de outra viagem, reutilizado, expirado, usuário desativado), status atual ao conectar, posição recusada fora de `em_andamento`, broadcast de status (via `PATCH`) e de posição, mensagem do staff ignorada, validação do payload, última posição na reconexão, persistência em `live_positions`, posição recusada após a conclusão.
+
+## App nativo: posições por HTTP
+
+No app Android, o Viajante **não** manda posições pelo WebSocket: o Android corta a rede da WebView alguns minutos depois de o app ir para segundo plano. O app usa `POST /trips/{id}/positions` ([Referência da API](api-reference.md)) por HTTP nativo, e o servidor retransmite a posição pelo WebSocket para quem acompanha — para o gerente, nada muda. O app continua conectado ao WebSocket para receber status e alertas enquanto está aberto.
 
 ## O que falta
 
